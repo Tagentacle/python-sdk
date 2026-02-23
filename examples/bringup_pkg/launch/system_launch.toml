@@ -1,0 +1,34 @@
+# Tagentacle System Launch Configuration
+# This file defines the system topology: which nodes to launch,
+# their startup parameters, and environment credentials.
+
+[daemon]
+addr = "127.0.0.1:19999"
+
+# --- Node Definitions ---
+
+[[nodes]]
+name = "mcp_server_node"
+package = "mcp_server_pkg"
+command = "python server.py"
+description = "Weather MCP Server providing tool calls over the bus"
+
+[[nodes]]
+name = "weather_agent_node"
+package = "agent_pkg"
+command = "python client.py"
+description = "Agent that calls weather tools via MCP-over-bus"
+depends_on = ["mcp_server_node"]  # Wait for server to be ready
+startup_delay = 2  # seconds to wait after dependency is launched
+
+# --- Parameter Injection ---
+# These will be injected as environment variables to all nodes
+
+[parameters]
+TAGENTACLE_DAEMON_URL = "tcp://127.0.0.1:19999"
+# API_KEY = "sk-..."          # Uncomment and set for production
+# BASE_URL = "https://..."    # LLM endpoint override
+
+# --- Tool Allow-Lists (per node) ---
+# [parameters.tools.weather_agent_node]
+# allowed = ["get_weather", "publish_to_topic"]
