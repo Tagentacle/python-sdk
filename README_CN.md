@@ -197,7 +197,7 @@ class MyAgent(LifecycleNode):
         self.api_key = os.environ.get("OPENAI_API_KEY", "")
 ```
 
-参见 `examples/bringup_pkg/config/secrets.toml.example` 获取模板。
+参见 `examples/src/bringup_pkg/config/secrets.toml.example` 获取模板。
 
 ## 配置
 
@@ -244,18 +244,19 @@ workspace/
 │       ├── agent_pkg/.venv → ...   # 符号链接到实际 .venv
 │       └── mcp_server_pkg/.venv → ...
 └── examples/
-    ├── agent_pkg/.venv/            # 真实 venv（uv sync 创建）
-    └── mcp_server_pkg/.venv/
+    └── src/
+        ├── agent_pkg/.venv/        # 真实 venv（uv sync 创建）
+        └── mcp_server_pkg/.venv/
 ```
 
 ### 运行节点
 
 ```bash
 # 运行单个包（自动激活其 .venv）
-tagentacle run --pkg examples/agent_pkg
+tagentacle run --pkg examples/src/agent_pkg
 
 # 启动完整拓扑（每个节点独立 venv）
-tagentacle launch examples/bringup_pkg/launch/system_launch.toml
+tagentacle launch examples/src/bringup_pkg/launch/system_launch.toml
 ```
 
 ### 清理
@@ -277,19 +278,20 @@ tagentacle-py/
 │       ├── __init__.py          # 公开导出
 │       ├── transport.py         # Client/Server 传输层
 │       └── publish_bridge.py    # MCP-Publish 桥接器节点
-├── examples/
-│   ├── agent_pkg/               # MCP 客户端 Agent 示例
-│   │   ├── pyproject.toml
-│   │   └── tagentacle.toml
-│   ├── mcp_server_pkg/          # MCP 天气服务器示例
-│   │   ├── pyproject.toml
-│   │   └── tagentacle.toml
-│   └── bringup_pkg/             # 系统 Bringup 启动器
-│       ├── pyproject.toml
-│       ├── tagentacle.toml
-│       ├── config/secrets.toml.example
-│       └── launch/system_launch.toml
-└── install/                     # 由 setup dep --all 生成
+├── examples/                        # 示例工作空间
+│   └── src/                         # 包放在此处
+│       ├── agent_pkg/               # MCP 客户端 Agent 示例
+│       │   ├── pyproject.toml
+│       │   └── tagentacle.toml
+│       ├── mcp_server_pkg/          # MCP 天气服务器示例
+│       │   ├── pyproject.toml
+│       │   └── tagentacle.toml
+│       └── bringup_pkg/             # 系统 Bringup 启动器
+│           ├── pyproject.toml
+│           ├── tagentacle.toml
+│           ├── config/secrets.toml.example
+│           └── launch/system_launch.toml
+└── install/                         # 由 setup dep --all 生成
     ├── setup_env.bash
     └── src/<pkg>/.venv → ...
 ```

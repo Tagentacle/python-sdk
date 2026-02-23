@@ -26,8 +26,9 @@ except ImportError:
 # Paths setup
 LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
 BRINGUP_DIR = os.path.dirname(LAUNCH_DIR)
-EXAMPLES_DIR = os.path.dirname(BRINGUP_DIR)
-ROOT_DIR = os.path.dirname(EXAMPLES_DIR)
+SRC_DIR = os.path.dirname(BRINGUP_DIR)        # examples/src/
+EXAMPLES_DIR = os.path.dirname(SRC_DIR)        # examples/
+ROOT_DIR = os.path.dirname(EXAMPLES_DIR)       # tagentacle-py/
 RUST_CORE_DIR = os.path.join(ROOT_DIR, "..", "tagentacle")
 
 
@@ -90,8 +91,8 @@ async def run_process(cmd: str, cwd: str, name: str, env: dict = None):
 
 
 def resolve_package_dir(package_name: str) -> str:
-    """Resolve package name to its directory."""
-    pkg_dir = os.path.join(EXAMPLES_DIR, package_name)
+    """Resolve package name to its directory (under src/)."""
+    pkg_dir = os.path.join(SRC_DIR, package_name)
     if os.path.isdir(pkg_dir):
         return pkg_dir
     raise FileNotFoundError(f"Package directory not found: {pkg_dir}")
