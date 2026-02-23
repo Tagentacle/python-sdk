@@ -8,10 +8,15 @@ Tagentacle Python SDK 提供双层 API，将 Python 程序连接到 [Tagentacle]
 
 ## 安装
 
+Tagentacle 使用 [uv](https://docs.astral.sh/uv/) 作为唯一支持的 Python 包管理器。
+
 ```bash
-pip install tagentacle-py
-# 或从源码安装
-cd tagentacle-py && pip install -e .
+# 安装 uv（如尚未安装）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 克隆并同步 SDK
+cd tagentacle-py
+uv sync
 ```
 
 ## 快速开始
@@ -201,21 +206,92 @@ class MyAgent(LifecycleNode):
 | `TAGENTACLE_DAEMON_URL` | `tcp://127.0.0.1:19999` | Daemon 地址 |
 | `TAGENTACLE_SECRETS_FILE` | _（无）_ | secrets.toml 路径 |
 
+## 环境与工作空间
+
+每个 Tagentacle 包都是一个 **uv 项目**，拥有独立的 `.venv`，支持每个节点使用不同的 Python 版本。
+
+### 包结构
+
+```
+my_pkg/
+├── pyproject.toml      # uv 项目配置（依赖声明）
+├── tagentacle.toml     # Tagentacle 包清单
+├── .venv/              # 由 `uv sync` 创建（git-ignored）
+├── main.py             # 节点代码
+└── .gitignore
+```
+
+### 工作空间初始化
+
+```bash
+# 安装工作空间内所有包的依赖
+tagentacle setup dep --all /path/to/workspace
+
+# 自动执行：
+#   1. 查找所有包含 tagentacle.toml 的目录
+#   2. 在有 pyproject.toml 的包中执行 uv sync
+#   3. 创建 install/ 结构（.venv 符号链接）
+#   4. 生成 install/setup_env.bash
+```
+
+生成的工作空间布局：
+
+```
+workspace/
+├── install/
+│   ├── setup_env.bash              # source 此脚本加载所有环境
+│   └── src/
+│       ├── agent_pkg/.venv → ...   # 符号链接到实际 .venv
+│       └── mcp_server_pkg/.venv → ...
+└── examples/
+    ├── agent_pkg/.venv/            # 真实 venv（uv sync 创建）
+    └── mcp_server_pkg/.venv/
+```
+
+### 运行节点
+
+```bash
+# 运行单个包（自动激活其 .venv）
+tagentacle run --pkg examples/agent_pkg
+
+# 启动完整拓扑（每个节点独立 venv）
+tagentacle launch examples/bringup_pkg/launch/system_launch.toml
+```
+
+### 清理
+
+```bash
+# 移除 install/ 结构
+tagentacle setup clean --workspace /path/to/workspace
+```
+
 ## 项目结构
 
 ```
 tagentacle-py/
+├── pyproject.toml               # uv 项目：SDK 依赖
+├── uv.lock                      # 锁定的依赖版本
 ├── tagentacle_py/
-│   ├── __init__.py          # Node, LifecycleNode, LifecycleState
+│   ├── __init__.py              # Node, LifecycleNode, LifecycleState
 │   └── mcp/
-│       ├── __init__.py      # 公开导出
-│       ├── transport.py     # Client/Server 传输层
-│       └── publish_bridge.py# MCP-Publish 桥接器节点
+│       ├── __init__.py          # 公开导出
+│       ├── transport.py         # Client/Server 传输层
+│       └── publish_bridge.py    # MCP-Publish 桥接器节点
 ├── examples/
-│   ├── agent_pkg/           # MCP 客户端 Agent 示例
-│   ├── mcp_server_pkg/      # MCP 天气服务器示例
-│   └── bringup_pkg/         # 系统 Bringup 启动器
-└── pyproject.toml
+│   ├── agent_pkg/               # MCP 客户端 Agent 示例
+│   │   ├── pyproject.toml
+│   │   └── tagentacle.toml
+│   ├── mcp_server_pkg/          # MCP 天气服务器示例
+│   │   ├── pyproject.toml
+│   │   └── tagentacle.toml
+│   └── bringup_pkg/             # 系统 Bringup 启动器
+│       ├── pyproject.toml
+│       ├── tagentacle.toml
+│       ├── config/secrets.toml.example
+│       └── launch/system_launch.toml
+└── install/                     # 由 setup dep --all 生成
+    ├── setup_env.bash
+    └── src/<pkg>/.venv → ...
 ```
 
 ## 许可证
