@@ -1,0 +1,12 @@
+[package]
+name = "mcp_server_pkg"
+version = "0.1.0"
+description = "Example MCP Server node providing weather tools over the Tagentacle bus"
+authors = ["Tagentacle Contributors"]
+type = "executable"
+
+[entry_points]
+node = "server:main"
+
+[dependencies]
+python = ["mcp", "anyio"]

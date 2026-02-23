@@ -1,0 +1,9 @@
+[package]
+name = "bringup_pkg"
+version = "0.1.0"
+description = "System bringup package: topology orchestration and parameter injection"
+authors = ["Tagentacle Contributors"]
+type = "bringup"
+
+[launch]
+config = "launch/system_launch.toml"
