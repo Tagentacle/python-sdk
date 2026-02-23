@@ -7,6 +7,40 @@ from enum import Enum
 from typing import Callable, Dict, Any, List, Optional
 
 
+def _load_secrets_file(path: str) -> Dict[str, str]:
+    """Load secrets from a TOML file. Returns dict of key-value pairs."""
+    secrets = {}
+    if not os.path.isfile(path):
+        return secrets
+    try:
+        try:
+            import tomllib
+        except ImportError:
+            try:
+                import tomli as tomllib
+            except ImportError:
+                # Fallback: simple line parser for KEY = "VALUE" format
+                with open(path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip('"').strip("'")
+                            secrets[k] = v
+                return secrets
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+        for k, v in data.items():
+            if isinstance(v, str):
+                secrets[k] = v
+    except Exception:
+        pass
+    return secrets
+
+
 class Node:
     """Simple API: Lightweight node for general-purpose programs.
     
@@ -33,6 +67,19 @@ class Node:
         self.services: Dict[str, Callable] = {}
         # request_id -> Future
         self.pending_requests: Dict[str, asyncio.Future] = {}
+        
+        # Auto-load secrets from TAGENTACLE_SECRETS_FILE if set
+        self._secrets: Dict[str, str] = {}
+        secrets_path = os.environ.get("TAGENTACLE_SECRETS_FILE", "")
+        if secrets_path:
+            self._secrets = _load_secrets_file(secrets_path)
+            if self._secrets:
+                self.logger.info(f"Loaded {len(self._secrets)} secret(s) from {secrets_path}")
+
+    @property
+    def secrets(self) -> Dict[str, str]:
+        """Secrets loaded from TAGENTACLE_SECRETS_FILE."""
+        return self._secrets
 
     async def connect(self):
         """Connect to Tagentacle Daemon bus and register existing subscriptions and services."""
@@ -250,6 +297,9 @@ class LifecycleNode(Node):
         super().__init__(node_id)
         self._state = LifecycleState.UNCONFIGURED
         self._config: Dict[str, Any] = {}
+        # Merge secrets into config for lifecycle access
+        if self._secrets:
+            self._config["secrets"] = dict(self._secrets)
 
     @property
     def state(self) -> LifecycleState:
