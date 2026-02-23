@@ -1,12 +1,22 @@
 import asyncio
 import json
+import logging
 import os
 import uuid
-from typing import Callable, Dict, Any, List
+from enum import Enum
+from typing import Callable, Dict, Any, List, Optional
+
 
 class Node:
+    """Simple API: Lightweight node for general-purpose programs.
+    
+    Provides publish(), subscribe(), service(), call_service() for quick
+    integration with the Tagentacle bus. No lifecycle management.
+    """
+
     def __init__(self, node_id: str):
         self.node_id = node_id
+        self.logger = logging.getLogger(f"tagentacle.{node_id}")
         # Get Daemon URL (default tcp://127.0.0.1:19999)
         url = os.environ.get("TAGENTACLE_DAEMON_URL", "tcp://127.0.0.1:19999")
         if url.startswith("tcp://"):
@@ -16,6 +26,7 @@ class Node:
         
         self.reader = None
         self.writer = None
+        self._connected = False
         # topic -> List[async-callbacks]
         self.subscribers: Dict[str, List[Callable]] = {}
         # service -> callback
@@ -25,9 +36,10 @@ class Node:
 
     async def connect(self):
         """Connect to Tagentacle Daemon bus and register existing subscriptions and services."""
-        print(f"Connecting to Tagentacle Daemon at {self.host}:{self.port}...")
+        self.logger.info(f"Connecting to Tagentacle Daemon at {self.host}:{self.port}...")
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
-        print(f"Node '{self.node_id}' connected.")
+        self._connected = True
+        self.logger.info(f"Node '{self.node_id}' connected.")
         
         # Batch register pre-defined subscriptions
         for topic in self.subscribers.keys():
@@ -37,13 +49,26 @@ class Node:
         for service in self.services.keys():
             await self._register_service(service)
 
+    async def disconnect(self):
+        """Gracefully disconnect from the Tagentacle Daemon."""
+        self._connected = False
+        if self.writer:
+            try:
+                self.writer.close()
+                await self.writer.wait_closed()
+            except Exception:
+                pass
+            self.writer = None
+            self.reader = None
+        self.logger.info(f"Node '{self.node_id}' disconnected.")
+
     def subscribe(self, topic: str):
         """Decorator: Subscribe to a specified Topic and register an async callback."""
         def decorator(func: Callable):
             if topic not in self.subscribers:
                 self.subscribers[topic] = []
                 # If already connected, register immediately (for dynamic subscription scenarios)
-                if self.writer:
+                if self._connected:
                     asyncio.create_task(self._register_subscription(topic))
             self.subscribers[topic].append(func)
             return func
@@ -74,7 +99,7 @@ class Node:
             if service_name not in self.services:
                 self.services[service_name] = func
                 # If already connected, register immediately
-                if self.writer:
+                if self._connected:
                     asyncio.create_task(self._register_service(service_name))
             return func
         return decorator
@@ -88,8 +113,8 @@ class Node:
         }
         await self._send_json(msg)
 
-    async def call_service(self, service_name: str, payload: Any):
-        """Call service synchronously and wait for response."""
+    async def call_service(self, service_name: str, payload: Any, timeout: float = 30.0):
+        """Call service and wait for response with timeout."""
         request_id = str(uuid.uuid4())
         future = asyncio.get_running_loop().create_future()
         self.pending_requests[request_id] = future
@@ -104,13 +129,16 @@ class Node:
         await self._send_json(msg)
         
         try:
-            return await future
+            return await asyncio.wait_for(future, timeout=timeout)
+        except asyncio.TimeoutError:
+            self.logger.error(f"Service call '{service_name}' timed out after {timeout}s")
+            raise
         finally:
             self.pending_requests.pop(request_id, None)
 
     async def _send_json(self, data: Dict):
         """Send a single line JSON (with newline)."""
-        if self.writer:
+        if self.writer and self._connected:
             line = json.dumps(data) + "\n"
             self.writer.write(line.encode())
             await self.writer.drain()
@@ -121,40 +149,42 @@ class Node:
             raise RuntimeError("Node is not connected. Call await node.connect() first.")
         
         try:
-            while not self.reader.at_eof():
+            while self._connected and not self.reader.at_eof():
                 line = await self.reader.readline()
                 if not line:
                     break
                 
                 try:
                     msg = json.loads(line.decode())
-                    op = msg.get("op")
-                    
-                    if op == "message":
-                        topic = msg.get("topic")
-                        if topic in self.subscribers:
-                            for callback in self.subscribers[topic]:
-                                asyncio.create_task(callback(msg))
-                    
-                    elif op == "call_service":
-                        service_name = msg.get("service")
-                        if service_name in self.services:
-                            asyncio.create_task(self._handle_service_call(msg))
-                    
-                    elif op == "service_response":
-                        request_id = msg.get("request_id")
-                        if request_id in self.pending_requests:
-                            self.pending_requests[request_id].set_result(msg.get("payload"))
-                            
+                    await self._dispatch(msg)
                 except json.JSONDecodeError:
                     continue
         except asyncio.CancelledError:
             pass
         finally:
-            if self.writer:
-                self.writer.close()
-                await self.writer.wait_closed()
-            print(f"Node '{self.node_id}' disconnected.")
+            await self.disconnect()
+
+    async def _dispatch(self, msg: Dict):
+        """Dispatch an inbound message to the appropriate handler."""
+        op = msg.get("op")
+        
+        if op == "message":
+            topic = msg.get("topic")
+            if topic in self.subscribers:
+                for callback in self.subscribers[topic]:
+                    asyncio.create_task(callback(msg))
+        
+        elif op == "call_service":
+            service_name = msg.get("service")
+            if service_name in self.services:
+                asyncio.create_task(self._handle_service_call(msg))
+        
+        elif op == "service_response":
+            request_id = msg.get("request_id")
+            if request_id in self.pending_requests:
+                future = self.pending_requests[request_id]
+                if not future.done():
+                    future.set_result(msg.get("payload"))
 
     async def _handle_service_call(self, msg: Dict):
         """Handle inbound service requests."""
@@ -182,7 +212,171 @@ class Node:
                 }
                 await self._send_json(resp)
             except Exception as e:
-                print(f"Error handling service {service_name}: {e}")
+                self.logger.error(f"Error handling service {service_name}: {e}")
+                # Send error response back to caller
+                resp = {
+                    "op": "service_response",
+                    "service": service_name,
+                    "request_id": request_id,
+                    "payload": {"error": str(e)},
+                    "caller_id": caller_id
+                }
+                await self._send_json(resp)
+
+
+# --- Lifecycle Node (Node API) ---
+
+class LifecycleState(Enum):
+    """Node lifecycle states, inspired by ROS 2 managed nodes."""
+    UNCONFIGURED = "unconfigured"
+    INACTIVE = "inactive"
+    ACTIVE = "active"
+    FINALIZED = "finalized"
+
+
+class LifecycleNode(Node):
+    """Node API: Full lifecycle-managed node for Agent development.
+    
+    Extends Node with lifecycle hooks (on_configure, on_activate, 
+    on_deactivate, on_shutdown) and Bringup config injection support.
+    Suitable for CLI-launched nodes accepting centralized configuration.
+    
+    Lifecycle: UNCONFIGURED -> configure() -> INACTIVE -> activate() -> ACTIVE
+                                                       <- deactivate() <-
+               INACTIVE/ACTIVE -> shutdown() -> FINALIZED
+    """
+
+    def __init__(self, node_id: str):
+        super().__init__(node_id)
+        self._state = LifecycleState.UNCONFIGURED
+        self._config: Dict[str, Any] = {}
+
+    @property
+    def state(self) -> LifecycleState:
+        """Current lifecycle state."""
+        return self._state
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Configuration injected during configure phase."""
+        return self._config
+
+    async def configure(self, config: Optional[Dict[str, Any]] = None):
+        """Transition: UNCONFIGURED -> INACTIVE. Calls on_configure()."""
+        if self._state != LifecycleState.UNCONFIGURED:
+            raise RuntimeError(f"Cannot configure from state {self._state.value}")
+        
+        self._config = config or {}
+        self.logger.info(f"[{self.node_id}] Configuring...")
+        
+        try:
+            result = self.on_configure(self._config)
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            self.logger.error(f"[{self.node_id}] on_configure() failed: {e}")
+            raise
+        
+        self._state = LifecycleState.INACTIVE
+        self.logger.info(f"[{self.node_id}] State -> INACTIVE")
+
+    async def activate(self):
+        """Transition: INACTIVE -> ACTIVE. Calls on_activate()."""
+        if self._state != LifecycleState.INACTIVE:
+            raise RuntimeError(f"Cannot activate from state {self._state.value}")
+        
+        self.logger.info(f"[{self.node_id}] Activating...")
+        
+        try:
+            result = self.on_activate()
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            self.logger.error(f"[{self.node_id}] on_activate() failed: {e}")
+            raise
+        
+        self._state = LifecycleState.ACTIVE
+        self.logger.info(f"[{self.node_id}] State -> ACTIVE")
+
+    async def deactivate(self):
+        """Transition: ACTIVE -> INACTIVE. Calls on_deactivate()."""
+        if self._state != LifecycleState.ACTIVE:
+            raise RuntimeError(f"Cannot deactivate from state {self._state.value}")
+        
+        self.logger.info(f"[{self.node_id}] Deactivating...")
+        
+        try:
+            result = self.on_deactivate()
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            self.logger.error(f"[{self.node_id}] on_deactivate() failed: {e}")
+            raise
+        
+        self._state = LifecycleState.INACTIVE
+        self.logger.info(f"[{self.node_id}] State -> INACTIVE")
+
+    async def shutdown(self):
+        """Transition: any -> FINALIZED. Calls on_shutdown()."""
+        self.logger.info(f"[{self.node_id}] Shutting down...")
+        
+        try:
+            result = self.on_shutdown()
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            self.logger.error(f"[{self.node_id}] on_shutdown() failed: {e}")
+        
+        self._state = LifecycleState.FINALIZED
+        await self.disconnect()
+        self.logger.info(f"[{self.node_id}] State -> FINALIZED")
+
+    async def bringup(self, config: Optional[Dict[str, Any]] = None):
+        """Convenience: connect + configure + activate in one call.
+        
+        Typical usage for CLI-launched nodes:
+            node = MyAgent("agent_1")
+            await node.bringup({"api_key": "sk-...", "tools": ["search"]})
+            await node.spin()
+        """
+        await self.connect()
+        await self.configure(config)
+        await self.activate()
+
+    # --- Override these in subclasses ---
+
+    def on_configure(self, config: Dict[str, Any]):
+        """Called during UNCONFIGURED -> INACTIVE transition.
+        
+        Use this to initialize resources, load API keys from config,
+        set up tool allow-lists, etc. Can be async.
+        """
+        pass
+
+    def on_activate(self):
+        """Called during INACTIVE -> ACTIVE transition.
+        
+        Use this to register subscriptions, start background tasks, etc.
+        Can be async.
+        """
+        pass
+
+    def on_deactivate(self):
+        """Called during ACTIVE -> INACTIVE transition.
+        
+        Use this to pause processing, unsubscribe from topics, etc.
+        Can be async.
+        """
+        pass
+
+    def on_shutdown(self):
+        """Called during any -> FINALIZED transition.
+        
+        Use this for cleanup: close file handles, save state, etc.
+        Can be async.
+        """
+        pass
+
 
 # Provide simplified exports
-__all__ = ["Node"]
+__all__ = ["Node", "LifecycleNode", "LifecycleState"]
