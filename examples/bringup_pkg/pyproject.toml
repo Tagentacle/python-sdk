@@ -1,0 +1,6 @@
+[project]
+name = "bringup-pkg"
+version = "0.1.0"
+description = "System bringup package for Tagentacle"
+requires-python = ">=3.10"
+dependencies = []

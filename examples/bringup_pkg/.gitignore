@@ -1,3 +1,4 @@
 # Auto-generated — do not edit
 # Actual secrets file; never committed to version control
 config/secrets.toml
+.venv/

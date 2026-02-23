@@ -1,8 +1,7 @@
 [project]
-name = "tagentacle-py"
+name = "agent-pkg"
 version = "0.1.0"
-description = "Tagentacle Python SDK — ROS for the AI Era"
-readme = "README.md"
+description = "Example AI Agent node for Tagentacle"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.0",
