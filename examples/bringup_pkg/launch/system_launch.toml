@@ -29,6 +29,11 @@ TAGENTACLE_DAEMON_URL = "tcp://127.0.0.1:19999"
 # API_KEY = "sk-..."          # Uncomment and set for production
 # BASE_URL = "https://..."    # LLM endpoint override
 
+# --- Secrets File ---
+# Secrets are loaded from a separate git-ignored file and injected as env vars.
+[secrets]
+secrets_file = "config/secrets.toml"
+
 # --- Tool Allow-Lists (per node) ---
 # [parameters.tools.weather_agent_node]
 # allowed = ["get_weather", "publish_to_topic"]

@@ -115,6 +115,29 @@ async def main():
     sdk_path = os.path.join(ROOT_DIR)
     inject_env["PYTHONPATH"] = sdk_path + (f":{inject_env.get('PYTHONPATH', '')}" if inject_env.get("PYTHONPATH") else "")
 
+    # Load secrets file and inject as env vars
+    secrets_cfg = config.get("secrets", {})
+    secrets_file = secrets_cfg.get("secrets_file", "")
+    if secrets_file:
+        secrets_path = os.path.join(BRINGUP_DIR, secrets_file)
+        if os.path.isfile(secrets_path):
+            inject_env["TAGENTACLE_SECRETS_FILE"] = secrets_path
+            try:
+                try:
+                    import tomllib as _toml
+                except ImportError:
+                    import tomli as _toml
+                with open(secrets_path, "rb") as sf:
+                    secret_data = _toml.load(sf)
+                for k, v in secret_data.items():
+                    if isinstance(v, str):
+                        inject_env[k] = v
+                print(f"[BRINGUP] Loaded {len(secret_data)} secret(s) from {secrets_path}")
+            except Exception as e:
+                print(f"[BRINGUP] Warning: failed to load secrets: {e}")
+        else:
+            print(f"[BRINGUP] Secrets file not found: {secrets_path} (skipped)")
+
     processes = []
 
     # 1. Start Daemon
