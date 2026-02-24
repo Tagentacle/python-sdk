@@ -199,6 +199,9 @@ await server.start()
 | `get_node_info` | Get details for a specific node (calls `/tagentacle/get_node_info`) |
 | `call_bus_service` | Call any Service on the bus via RPC |
 | `ping_daemon` | Check Daemon health (calls `/tagentacle/ping`) |
+| `describe_topic_schema` | Retrieve the JSON Schema definition for a specific Topic's message format. Enables LLMs to query schema on-demand before publishing, avoiding context bloat. |
+
+**Dynamic Flattened Tools** *(Planned)*: The SDK will provide an API to auto-generate flattened MCP tools from Topic JSON Schema definitions. For example, registering a `/chat/input` schema with `{text: string, sender: string}` will auto-generate a `publish_chat_input(text, sender)` tool with expanded parameters — no nested JSON required from the LLM.
 
 ## Agent Architecture: IO + Inference Separation
 
@@ -377,6 +380,28 @@ tagentacle-py/
     ├── setup_env.bash
     └── src/<pkg>/.venv → ...
 ```
+
+## Roadmap
+
+### Completed
+- [x] **Simple API (`Node`)**: `connect`, `publish`, `subscribe`, `service`, `call_service`, `spin`.
+- [x] **Lifecycle API (`LifecycleNode`)**: `on_configure` / `on_activate` / `on_deactivate` / `on_shutdown`, `bringup()` convenience method.
+- [x] **MCP Transport Layer**: `TagentacleClientTransport` and `TagentacleServerTransport` — Bus-as-Transport for MCP sessions.
+- [x] **Tagentacle MCP Server**: Built-in MCP Server exposing bus tools (`publish_to_topic`, `subscribe_topic`, `list_nodes`, `list_topics`, `list_services`, `call_bus_service`, `ping_daemon`, `describe_topic_schema`).
+- [x] **Secrets Management**: Auto-load `secrets.toml`, bringup environment variable injection.
+- [x] **Bringup Utilities**: `load_pkg_toml`, `discover_packages`, `find_workspace_root`.
+- [x] **Example Workspace**: `example_ws/src/` with agent_pkg, mcp_server_pkg, bringup_pkg.
+
+### Planned
+- [ ] **`get_logger()` Integration**: Auto-publish node logs to `/tagentacle/log` via a custom Python logging handler (local stderr + bus publish).
+- [ ] **Node Event Auto-Reporting**: `LifecycleNode` auto-publishes state transitions to `/tagentacle/node_events`.
+- [ ] **Diagnostics Heartbeat**: `Node.spin()` periodically publishes health reports to `/tagentacle/diagnostics`.
+- [ ] **`describe_topic_schema` Tool**: On-demand Topic JSON Schema query — LLM retrieves schema before publishing, avoiding context bloat.
+- [ ] **Flattened Topic Tools API**: SDK API to auto-generate flattened MCP tools from Topic JSON Schema definitions (e.g., `/chat/input` schema → `publish_chat_input(text, sender)` with expanded parameters).
+- [ ] **JSON Schema Validation**: Client-side message validation before publish, rejecting malformed payloads at the SDK level.
+- [ ] **Buffered Subscription**: Optional message buffer for subscriptions — accumulate messages while the agent is in inference, drain on completion.
+- [ ] **Action Client/Server**: Long-running async task API with progress feedback (analogous to ROS 2 Actions).
+- [ ] **Parameter Client**: Read/write Daemon parameter store, subscribe to `/tagentacle/parameter_events`.
 
 ## License
 

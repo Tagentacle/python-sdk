@@ -197,6 +197,9 @@ await server.start()
 | `get_node_info` | 获取节点详情（调用 `/tagentacle/get_node_info`）|
 | `call_bus_service` | 通过 RPC 调用总线上的任意 Service |
 | `ping_daemon` | 检查 Daemon 健康状态（调用 `/tagentacle/ping`）|
+| `describe_topic_schema` | 获取某个 Topic 的消息 JSON Schema 定义。使 LLM 可以在发布前按需查询 schema，避免上下文膨胀。 |
+
+**动态展平工具** *（计划中）*：SDK 将提供 API，根据 Topic JSON Schema 定义自动生成展平参数的 MCP 工具。例如，注册 `/chat/input` 的 Schema `{text: string, sender: string}` 后，自动生成 `publish_chat_input(text, sender)` 工具——LLM 无需构造嵌套 JSON。
 
 ## Agent 架构：IO + Inference 分离
 
@@ -373,6 +376,28 @@ tagentacle-py/
     ├── setup_env.bash
     └── src/<pkg>/.venv → ...
 ```
+
+## 路线图
+
+### 已完成
+- [x] **简单 API (`Node`)**：`connect`、`publish`、`subscribe`、`service`、`call_service`、`spin`。
+- [x] **生命周期 API (`LifecycleNode`)**：`on_configure` / `on_activate` / `on_deactivate` / `on_shutdown`，`bringup()` 便捷方法。
+- [x] **MCP 传输层**：`TagentacleClientTransport` 和 `TagentacleServerTransport` — 总线即传输层。
+- [x] **Tagentacle MCP Server**：内置 MCP Server，暴露总线工具（`publish_to_topic`、`subscribe_topic`、`list_nodes`、`list_topics`、`list_services`、`call_bus_service`、`ping_daemon`、`describe_topic_schema`）。
+- [x] **秘钥管理**：自动加载 `secrets.toml`，Bringup 环境变量注入。
+- [x] **Bringup 工具函数**：`load_pkg_toml`、`discover_packages`、`find_workspace_root`。
+- [x] **示例 Workspace**：`example_ws/src/` 包含 agent_pkg、mcp_server_pkg、bringup_pkg。
+
+### 计划中
+- [ ] **`get_logger()` 集成**：通过自定义 Python logging handler 自动发布节点日志到 `/tagentacle/log`（本地 stderr + 总线 publish）。
+- [ ] **节点事件自动上报**：`LifecycleNode` 状态转换时自动发布到 `/tagentacle/node_events`。
+- [ ] **诊断心跳**：`Node.spin()` 定时发布健康报告到 `/tagentacle/diagnostics`。
+- [ ] **`describe_topic_schema` 工具**：按需查询 Topic JSON Schema — LLM 在发布前获取 schema，避免上下文膨胀。
+- [ ] **展平 Topic 工具 API**：SDK 提供 API，根据 Topic JSON Schema 定义自动生成展平参数的 MCP 工具（如 `/chat/input` schema → `publish_chat_input(text, sender)` 展开参数）。
+- [ ] **JSON Schema 校验**：客户端侧消息校验，在 SDK 层拦截不合格的 payload。
+- [ ] **缓冲订阅**：订阅消息可选缓冲 — Agent 推理期间累积消息，推理完成后一次性消费。
+- [ ] **Action 客户端/服务端**：长程异步任务 API，支持进度反馈（类比 ROS 2 Action）。
+- [ ] **Parameter 客户端**：读写 Daemon 参数存储，订阅 `/tagentacle/parameter_events`。
 
 ## 许可证
 
