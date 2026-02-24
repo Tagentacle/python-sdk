@@ -175,16 +175,94 @@ async with tagentacle_server_transport(node) as (read, write):
     await mcp_server.run(read, write, mcp_server.create_initialization_options())
 ```
 
-### MCP-Publish Bridge
+### Tagentacle MCP Server (Bus Interaction Tools)
 
-Pre-built MCP Server that exposes `publish_to_topic` as an MCP Tool:
+Built-in MCP Server that exposes **all bus interaction capabilities** as MCP Tools, allowing Agent Nodes to autonomously interact with the entire Tagentacle bus through standard MCP tool calls:
 
 ```python
-from tagentacle_py.mcp.publish_bridge import MCPPublishBridge
+from tagentacle_py.mcp.tagentacle_mcp_server import TagentacleMCPServer
 
-bridge = MCPPublishBridge("bridge_node", topic_allowlist=["/alerts", "/logs"])
-await bridge.start()
+server = TagentacleMCPServer("bus_tools_node", allowed_topics=["/alerts", "/logs"])
+await server.start()
 ```
+
+**Exposed MCP Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `publish_to_topic` | Publish a JSON message to a bus Topic |
+| `subscribe_topic` | Subscribe to a Topic and start receiving messages |
+| `unsubscribe_topic` | Unsubscribe from a previously subscribed Topic |
+| `list_nodes` | List all connected nodes (calls `/tagentacle/list_nodes`) |
+| `list_topics` | List all active Topics (calls `/tagentacle/list_topics`) |
+| `list_services` | List all registered Services (calls `/tagentacle/list_services`) |
+| `get_node_info` | Get details for a specific node (calls `/tagentacle/get_node_info`) |
+| `call_bus_service` | Call any Service on the bus via RPC |
+| `ping_daemon` | Check Daemon health (calls `/tagentacle/ping`) |
+
+## Agent Architecture: IO + Inference Separation
+
+Tagentacle adopts a clean separation between **Agent Nodes** and **Inference Nodes**:
+
+### Agent Node = Complete Agentic Loop
+
+An Agent Node is a single Pkg that owns the entire agentic loop:
+- Subscribe to Topics → receive user messages / events
+- Manage the context window (message queue, context engineering)
+- Call Inference Node's Service for LLM completion
+- Parse `tool_calls` → execute tools via MCP Transport → backfill results → re-infer
+
+This loop is tightly-coupled and should **not** be split across multiple Nodes.
+
+### Inference Node = Stateless LLM Gateway
+
+A separate Pkg (official example at org level, not part of core SDK) providing:
+- Service (e.g., `/inference/chat`) accepting OpenAI-compatible format
+- Multiple Agent Nodes can call the same Inference Node concurrently
+
+```
+UI Node ──publish──▶ /chat/input ──▶ Agent Node (agentic loop)
+                                        │
+                                        ├─ call_service("/inference/chat") ──▶ Inference Node
+                                        │◀── completion (with tool_calls) ◀───┘
+                                        │
+                                        ├─ MCP Transport ──▶ Tool Server Node
+                                        │◀── tool result ◀──┘
+                                        │
+                                        └─ publish ──▶ /chat/output ──▶ UI Node
+```
+
+## Standard Topics & Services
+
+The Daemon provides built-in **system Topics and Services** under the `/tagentacle/` namespace:
+
+### Reserved Namespaces
+
+| Prefix | Purpose |
+|---|---|
+| `/tagentacle/*` | System reserved (Daemon & SDK core) |
+| `/mcp/*` | MCP protocol (audit, RPC tunnels) |
+
+### Standard Topics
+
+| Topic | Description |
+|---|---|
+| `/tagentacle/log` | Global log aggregation (analogous to ROS `/rosout`) |
+| `/tagentacle/node_events` | Node lifecycle events (connected/disconnected/transitions) |
+| `/tagentacle/diagnostics` | Node health heartbeats and resource reports |
+| `/mcp/traffic` | MCP JSON-RPC audit stream |
+
+### Standard Services
+
+| Service | Description |
+|---|---|
+| `/tagentacle/ping` | Daemon health check |
+| `/tagentacle/list_nodes` | List all connected nodes |
+| `/tagentacle/list_topics` | List all active Topics |
+| `/tagentacle/list_services` | List all registered Services |
+| `/tagentacle/get_node_info` | Get details for a specific node |
+
+All standard Services are also accessible as MCP Tools via the `TagentacleMCPServer`.
 
 ## Secrets Management
 
@@ -281,7 +359,7 @@ tagentacle-py/
 │   └── mcp/
 │       ├── __init__.py          # Public exports
 │       ├── transport.py         # Client/Server transport
-│       └── publish_bridge.py    # MCP-Publish Bridge Node
+│       └── tagentacle_mcp_server.py  # Tagentacle MCP Server (bus tools)
 ├── examples/                        # Example workspace
 │   └── src/                         # Packages live here
 │       ├── agent_pkg/               # MCP client agent

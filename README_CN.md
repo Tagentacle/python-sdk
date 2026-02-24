@@ -173,16 +173,94 @@ async with tagentacle_server_transport(node) as (read, write):
     await mcp_server.run(read, write, mcp_server.create_initialization_options())
 ```
 
-### MCP-Publish 桥接器
+### Tagentacle MCP Server（总线交互工具）
 
-内置 MCP Server，将 `publish_to_topic` 暴露为 MCP Tool：
+内置 MCP Server，将**所有总线交互能力**暴露为 MCP Tool，使 Agent Node 可以通过标准 MCP 工具调用自主与整个 Tagentacle 总线交互：
 
 ```python
-from tagentacle_py.mcp.publish_bridge import MCPPublishBridge
+from tagentacle_py.mcp.tagentacle_mcp_server import TagentacleMCPServer
 
-bridge = MCPPublishBridge("bridge_node", topic_allowlist=["/alerts", "/logs"])
-await bridge.start()
+server = TagentacleMCPServer("bus_tools_node", allowed_topics=["/alerts", "/logs"])
+await server.start()
 ```
+
+**暴露的 MCP Tool：**
+
+| 工具 | 说明 |
+|------|------|
+| `publish_to_topic` | 向 Topic 发布 JSON 消息 |
+| `subscribe_topic` | 订阅 Topic 并开始接收消息 |
+| `unsubscribe_topic` | 取消订阅 |
+| `list_nodes` | 列出所有连接节点（调用 `/tagentacle/list_nodes`）|
+| `list_topics` | 列出所有活跃 Topic（调用 `/tagentacle/list_topics`）|
+| `list_services` | 列出所有已注册 Service（调用 `/tagentacle/list_services`）|
+| `get_node_info` | 获取节点详情（调用 `/tagentacle/get_node_info`）|
+| `call_bus_service` | 通过 RPC 调用总线上的任意 Service |
+| `ping_daemon` | 检查 Daemon 健康状态（调用 `/tagentacle/ping`）|
+
+## Agent 架构：IO + Inference 分离
+
+Tagentacle 采用 **Agent Node**（上下文工程 + agentic loop）与 **Inference Node**（无状态 LLM 网关）的分离设计：
+
+### Agent Node = 完整的 Agentic Loop
+
+Agent Node 是一个独立 Pkg，在内部完成整个 agentic loop：
+- 订阅 Topic → 接收用户消息/事件通知
+- 管理 context window（消息队列、上下文工程）
+- 通过 Service RPC 调用 Inference Node 获取 completion
+- 解析 `tool_calls` → 通过 MCP Transport 执行工具 → 回填结果 → 再推理
+
+这个 loop 是紧耦合的顺序控制流，**不应**被拆分到多个 Node。
+
+### Inference Node = 无状态 LLM 网关
+
+独立的 Pkg（官方示例，位于 org 级别，非核心 SDK 组成部分），提供：
+- Service（如 `/inference/chat`），接受 OpenAI 兼容格式
+- 多个 Agent Node 可并发调用同一个 Inference Node
+
+```
+UI Node ──publish──▶ /chat/input ──▶ Agent Node (agentic loop)
+                                        │
+                                        ├─ call_service("/inference/chat") ──▶ Inference Node
+                                        │◀── completion (with tool_calls) ◀───┘
+                                        │
+                                        ├─ MCP Transport ──▶ Tool Server Node
+                                        │◀── tool result ◀──┘
+                                        │
+                                        └─ publish ──▶ /chat/output ──▶ UI Node
+```
+
+## 标准 Topic 与 Service
+
+Daemon 提供 `/tagentacle/` 命名空间下的内置**系统 Topic 和 Service**：
+
+### 保留命名空间
+
+| 前缀 | 用途 |
+|---|---|
+| `/tagentacle/*` | 系统保留（Daemon 与 SDK 核心）|
+| `/mcp/*` | MCP 协议（审计、RPC 隧道）|
+
+### 标准 Topic
+
+| Topic | 说明 |
+|---|---|
+| `/tagentacle/log` | 全局日志聚合（类比 ROS `/rosout`）|
+| `/tagentacle/node_events` | 节点生命周期事件（上线/下线/状态转换）|
+| `/tagentacle/diagnostics` | 节点健康心跳与资源报告 |
+| `/mcp/traffic` | MCP JSON-RPC 审计流 |
+
+### 标准 Service
+
+| Service | 说明 |
+|---|---|
+| `/tagentacle/ping` | Daemon 健康检测 |
+| `/tagentacle/list_nodes` | 列出所有已连接节点 |
+| `/tagentacle/list_topics` | 列出所有活跃 Topic |
+| `/tagentacle/list_services` | 列出所有已注册 Service |
+| `/tagentacle/get_node_info` | 获取单个节点详情 |
+
+所有标准 Service 也可通过 `TagentacleMCPServer` 作为 MCP Tool 访问。
 
 ## 秘钥管理
 
@@ -277,7 +355,7 @@ tagentacle-py/
 │   └── mcp/
 │       ├── __init__.py          # 公开导出
 │       ├── transport.py         # Client/Server 传输层
-│       └── publish_bridge.py    # MCP-Publish 桥接器节点
+│       └── tagentacle_mcp_server.py  # Tagentacle MCP Server（总线工具）
 ├── examples/                        # 示例工作空间
 │   └── src/                         # 包放在此处
 │       ├── agent_pkg/               # MCP 客户端 Agent 示例
