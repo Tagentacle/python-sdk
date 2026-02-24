@@ -1,6 +1,6 @@
 # Tagentacle Python SDK
 
-> **ROS for the AI Era** — A lightweight message bus SDK for building multi-agent systems with native MCP integration.
+> **ROS for AI Agent** — A lightweight message bus SDK for building multi-agent systems with native MCP integration.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
