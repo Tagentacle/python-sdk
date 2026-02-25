@@ -1,7 +1,7 @@
 [project]
 name = "tagentacle-py"
 version = "0.1.0"
-description = "Tagentacle Python SDK — ROS for AI Agent"
+description = "Tagentacle Python SDK — The ROS of AI Agents"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

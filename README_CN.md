@@ -1,6 +1,6 @@
 # Tagentacle Python SDK
 
-> **ROS for AI Agent** — 轻量级消息总线 SDK，用于构建多智能体系统，原生集成 MCP。
+> **The ROS of AI Agents** — 轻量级消息总线 SDK，用于构建多智能体系统，原生集成 MCP。
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
