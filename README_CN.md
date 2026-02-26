@@ -1,10 +1,39 @@
-# Tagentacle Python SDK
+# Tagentacle Python SDK（已归档）
 
-> **The ROS of AI Agents** — 轻量级消息总线 SDK，用于构建多智能体系统，原生集成 MCP。
+> **⚠️ 此仓库已拆分为两个独立包，请使用下方的新仓库。**
+
+---
+
+## 新仓库
+
+Tagentacle Python SDK 已按照 **1-repo-1-package** 布局拆分为两个独立包：
+
+| 包名 | 仓库 | 说明 |
+|---|---|---|
+| `tagentacle-py-core` | [python-sdk-core](https://github.com/Tagentacle/python-sdk-core) | `Node`、`LifecycleNode`、包工具函数 |
+| `tagentacle-py-mcp` | [python-sdk-mcp](https://github.com/Tagentacle/python-sdk-mcp) | MCP 传输层、`TagentacleMCPServer` |
+
+```bash
+# 安装核心 SDK
+pip install tagentacle-py-core
+
+# 安装 MCP 集成（依赖核心包）
+pip install tagentacle-py-mcp
+```
+
+或在项目中使用 uv：
+```bash
+uv add tagentacle-py-core
+uv add tagentacle-py-mcp   # 如需 MCP 集成
+```
+
+---
+
+## python-sdk-core
+
+提供双层 API，将 Python 程序连接到 [Tagentacle](https://github.com/Tagentacle/tagentacle) 消息总线守护进程。
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-
-Tagentacle Python SDK 提供双层 API，将 Python 程序连接到 [Tagentacle](https://github.com/Tagentacle/tagentacle) 消息总线守护进程。
 
 ## 安装
 
@@ -14,8 +43,14 @@ Tagentacle 使用 [uv](https://docs.astral.sh/uv/) 作为唯一支持的 Python 
 # 安装 uv（如尚未安装）
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 克隆并同步 SDK
-cd tagentacle-py
+# 克隆并同步核心 SDK
+git clone https://github.com/Tagentacle/python-sdk-core
+cd python-sdk-core
+uv sync
+
+# 克隆并同步 MCP 集成
+git clone https://github.com/Tagentacle/python-sdk-mcp
+cd python-sdk-mcp
 uv sync
 ```
 
@@ -134,6 +169,12 @@ INACTIVE/ACTIVE → shutdown() → FINALIZED
 | `deactivate()` | 转为 INACTIVE 状态，调用 `on_deactivate()` |
 | `shutdown()` | 终结并断开连接，调用 `on_shutdown()` |
 | `bringup(config)` | 便捷方法：connect + configure + activate |
+
+## python-sdk-mcp
+
+提供 MCP 传输层和内置 `TagentacleMCPServer`，依赖 `tagentacle-py-core`。
+
+详见 [python-sdk-mcp](https://github.com/Tagentacle/python-sdk-mcp)。
 
 ## MCP 集成
 
@@ -347,35 +388,28 @@ tagentacle launch examples/src/bringup_pkg/launch/system_launch.toml
 tagentacle setup clean --workspace /path/to/workspace
 ```
 
-## 项目结构
+## 仓库结构（拆分后）
 
 ```
-tagentacle-py/
-├── pyproject.toml               # uv 项目：SDK 依赖
-├── uv.lock                      # 锁定的依赖版本
-├── tagentacle_py/
-│   ├── __init__.py              # Node, LifecycleNode, LifecycleState
-│   └── mcp/
-│       ├── __init__.py          # 公开导出
-│       ├── transport.py         # Client/Server 传输层
-│       └── tagentacle_mcp_server.py  # Tagentacle MCP Server（总线工具）
-├── examples/                        # 示例工作空间
-│   └── src/                         # 包放在此处
-│       ├── agent_pkg/               # MCP 客户端 Agent 示例
-│       │   ├── pyproject.toml
-│       │   └── tagentacle.toml
-│       ├── mcp_server_pkg/          # MCP 天气服务器示例
-│       │   ├── pyproject.toml
-│       │   └── tagentacle.toml
-│       └── bringup_pkg/             # 系统 Bringup 启动器
-│           ├── pyproject.toml
-│           ├── tagentacle.toml
-│           ├── config/secrets.toml.example
-│           └── launch/system_launch.toml
-└── install/                         # 由 setup dep --all 生成
-    ├── setup_env.bash
-    └── src/<pkg>/.venv → ...
+python-sdk-core/              # → github.com/Tagentacle/python-sdk-core
+├── pyproject.toml
+├── tagentacle.toml
+├── tagentacle_py_core/
+│   └── __init__.py           # Node, LifecycleNode, LifecycleState
+└── uv.lock
+
+python-sdk-mcp/               # → github.com/Tagentacle/python-sdk-mcp
+├── pyproject.toml
+├── tagentacle.toml
+├── server_node.py
+├── tagentacle_py_mcp/
+│   ├── __init__.py
+│   ├── transport.py          # 客户端/服务端 MCP 传输
+│   └── publish_bridge.py
+└── uv.lock
 ```
+
+此仓库的 `example_ws/` 保留了旧的 3 节点示例（agent + mcp_server + bringup）。完整的 5 节点聊天机器人系统请参考 [example-bringup](https://github.com/Tagentacle/example-bringup)。
 
 ## 路线图
 
