@@ -10,8 +10,8 @@ Tagentacle Python SDK 已按照 **1-repo-1-package** 布局拆分为两个独立
 
 | 包名 | 仓库 | 说明 |
 |---|---|---|
-| `tagentacle-py-core` | [python-sdk-core](https://github.com/Tagentacle/python-sdk-core) | `Node`、`LifecycleNode`、包工具函数 |
-| `tagentacle-py-mcp` | [python-sdk-mcp](https://github.com/Tagentacle/python-sdk-mcp) | MCP 传输层、`TagentacleMCPServer` |
+| `tagentacle-py-core` | [tagentacle-py-core](https://github.com/Tagentacle/tagentacle-py-core) | `Node`、`LifecycleNode`、包工具函数 |
+| `tagentacle-py-mcp` | [tagentacle-py-mcp](https://github.com/Tagentacle/tagentacle-py-mcp) | MCP 传输层、`TagentacleMCPServer` |
 
 ```bash
 # 安装核心 SDK
@@ -29,7 +29,7 @@ uv add tagentacle-py-mcp   # 如需 MCP 集成
 
 ---
 
-## python-sdk-core
+## tagentacle-py-core
 
 提供双层 API，将 Python 程序连接到 [Tagentacle](https://github.com/Tagentacle/tagentacle) 消息总线守护进程。
 
@@ -44,13 +44,13 @@ Tagentacle 使用 [uv](https://docs.astral.sh/uv/) 作为唯一支持的 Python 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 克隆并同步核心 SDK
-git clone https://github.com/Tagentacle/python-sdk-core
-cd python-sdk-core
+git clone https://github.com/Tagentacle/tagentacle-py-core
+cd tagentacle-py-core
 uv sync
 
 # 克隆并同步 MCP 集成
-git clone https://github.com/Tagentacle/python-sdk-mcp
-cd python-sdk-mcp
+git clone https://github.com/Tagentacle/tagentacle-py-mcp
+cd tagentacle-py-mcp
 uv sync
 ```
 
@@ -170,11 +170,11 @@ INACTIVE/ACTIVE → shutdown() → FINALIZED
 | `shutdown()` | 终结并断开连接，调用 `on_shutdown()` |
 | `bringup(config)` | 便捷方法：connect + configure + activate |
 
-## python-sdk-mcp
+## tagentacle-py-mcp
 
 提供 MCP 传输层和内置 `TagentacleMCPServer`，依赖 `tagentacle-py-core`。
 
-详见 [python-sdk-mcp](https://github.com/Tagentacle/python-sdk-mcp)。
+详见 [tagentacle-py-mcp](https://github.com/Tagentacle/tagentacle-py-mcp)。
 
 ## MCP 集成
 
@@ -391,14 +391,14 @@ tagentacle setup clean --workspace /path/to/workspace
 ## 仓库结构（拆分后）
 
 ```
-python-sdk-core/              # → github.com/Tagentacle/python-sdk-core
+tagentacle-py-core/              # → github.com/Tagentacle/tagentacle-py-core
 ├── pyproject.toml
 ├── tagentacle.toml
 ├── tagentacle_py_core/
 │   └── __init__.py           # Node, LifecycleNode, LifecycleState
 └── uv.lock
 
-python-sdk-mcp/               # → github.com/Tagentacle/python-sdk-mcp
+tagentacle-py-mcp/               # → github.com/Tagentacle/tagentacle-py-mcp
 ├── pyproject.toml
 ├── tagentacle.toml
 ├── server_node.py

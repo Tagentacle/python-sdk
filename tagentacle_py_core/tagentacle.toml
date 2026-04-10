@@ -1,0 +1,6 @@
+[package]
+name = "tagentacle_py_core"
+version = "0.1.0"
+description = "Tagentacle Python Core SDK — Node, LifecycleNode, and package utilities"
+authors = ["Tagentacle Contributors"]
+type = "library"

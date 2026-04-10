@@ -10,8 +10,8 @@ The Tagentacle Python SDK has been restructured following a **1-repo-1-package**
 
 | Package | Repo | Description |
 |---|---|---|
-| `tagentacle-py-core` | [python-sdk-core](https://github.com/Tagentacle/python-sdk-core) | `Node`, `LifecycleNode`, package utilities |
-| `tagentacle-py-mcp` | [python-sdk-mcp](https://github.com/Tagentacle/python-sdk-mcp) | MCP transport layer, `TagentacleMCPServer` |
+| `tagentacle-py-core` | [tagentacle-py-core](https://github.com/Tagentacle/tagentacle-py-core) | `Node`, `LifecycleNode`, package utilities |
+| `tagentacle-py-mcp` | [tagentacle-py-mcp](https://github.com/Tagentacle/tagentacle-py-mcp) | MCP transport layer, `TagentacleMCPServer` |
 
 ```bash
 # Install core SDK
@@ -29,7 +29,7 @@ uv add tagentacle-py-mcp   # if you need MCP integration
 
 ---
 
-## python-sdk-core
+## tagentacle-py-core
 
 Provides the dual-layer API for connecting Python programs to the [Tagentacle](https://github.com/Tagentacle/tagentacle) message bus daemon.
 
@@ -44,13 +44,13 @@ Tagentacle uses [uv](https://docs.astral.sh/uv/) as the sole supported Python pa
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone and sync the core SDK
-git clone https://github.com/Tagentacle/python-sdk-core
-cd python-sdk-core
+git clone https://github.com/Tagentacle/tagentacle-py-core
+cd tagentacle-py-core
 uv sync
 
 # Clone and sync the MCP integration
-git clone https://github.com/Tagentacle/python-sdk-mcp
-cd python-sdk-mcp
+git clone https://github.com/Tagentacle/tagentacle-py-mcp
+cd tagentacle-py-mcp
 uv sync
 ```
 
@@ -172,11 +172,11 @@ INACTIVE/ACTIVE → shutdown() → FINALIZED
 | `shutdown()` | Finalize and disconnect, call `on_shutdown()` |
 | `bringup(config)` | Convenience: connect + configure + activate |
 
-## python-sdk-mcp
+## tagentacle-py-mcp
 
 Provides the MCP transport layer and the built-in `TagentacleMCPServer`. Requires `tagentacle-py-core`.
 
-See [python-sdk-mcp](https://github.com/Tagentacle/python-sdk-mcp) for the full README.
+See [tagentacle-py-mcp](https://github.com/Tagentacle/tagentacle-py-mcp) for the full README.
 
 ## MCP Integration
 
@@ -395,14 +395,14 @@ tagentacle setup clean --workspace /path/to/workspace
 ## Repository Structure (after split)
 
 ```
-python-sdk-core/              # → github.com/Tagentacle/python-sdk-core
+tagentacle-py-core/              # → github.com/Tagentacle/tagentacle-py-core
 ├── pyproject.toml
 ├── tagentacle.toml
 ├── tagentacle_py_core/
 │   └── __init__.py           # Node, LifecycleNode, LifecycleState
 └── uv.lock
 
-python-sdk-mcp/               # → github.com/Tagentacle/python-sdk-mcp
+tagentacle-py-mcp/               # → github.com/Tagentacle/tagentacle-py-mcp
 ├── pyproject.toml
 ├── tagentacle.toml
 ├── server_node.py

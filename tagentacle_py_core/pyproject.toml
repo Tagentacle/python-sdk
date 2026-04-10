@@ -1,0 +1,11 @@
+[project]
+name = "tagentacle-py-core"
+version = "0.1.0"
+description = "Tagentacle Python Core SDK — Node, LifecycleNode, and package utilities"
+readme = "../README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
